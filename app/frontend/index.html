@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Deal Calculator</title>
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f1117;
+      color: #e1e4e8;
+      min-height: 100vh;
+    }
+
+    .app {
+      max-width: 480px;
+      margin: 0 auto;
+      padding: 16px;
+      padding-bottom: 100px;
+    }
+
+    /* Header */
+    .header {
+      text-align: center;
+      padding: 24px 0 16px;
+    }
+    .header h1 {
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+    }
+    .header p {
+      font-size: 13px;
+      color: #8b949e;
+      margin-top: 4px;
+    }
+
+    /* Cards */
+    .card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .card-title {
+      font-size: 13px;
+      font-weight: 600;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    /* Form fields */
+    .field {
+      margin-bottom: 14px;
+    }
+    .field:last-child {
+      margin-bottom: 0;
+    }
+    .field label {
+      display: block;
+      font-size: 13px;
+      color: #c9d1d9;
+      margin-bottom: 6px;
+      font-weight: 500;
+    }
+    .field input, .field select {
+      width: 100%;
+      padding: 10px 12px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      color: #e1e4e8;
+      font-size: 15px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .field input:focus, .field select:focus {
+      border-color: #58a6ff;
+    }
+
+    /* Slider */
+    .slider-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .slider-row input[type="range"] {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 6px;
+      background: #30363d;
+      border-radius: 3px;
+      border: none;
+      padding: 0;
+    }
+    .slider-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px;
+      height: 20px;
+      background: #58a6ff;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+    .slider-value {
+      min-width: 52px;
+      text-align: right;
+      font-size: 16px;
+      font-weight: 600;
+      color: #58a6ff;
+    }
+
+    /* Toggle */
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .toggle {
+      position: relative;
+      width: 44px;
+      height: 24px;
+      cursor: pointer;
+    }
+    .toggle input { display: none; }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: #30363d;
+      border-radius: 12px;
+      transition: background 0.2s;
+    }
+    .toggle input:checked + .toggle-track {
+      background: #58a6ff;
+    }
+    .toggle-thumb {
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      width: 20px;
+      height: 20px;
+      background: #fff;
+      border-radius: 50%;
+      transition: transform 0.2s;
+    }
+    .toggle input:checked ~ .toggle-thumb {
+      transform: translateX(20px);
+    }
+
+    /* Geo chips */
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .chip {
+      padding: 6px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      cursor: pointer;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      color: #8b949e;
+      transition: all 0.2s;
+    }
+    .chip.active {
+      background: #1f3a5f;
+      border-color: #58a6ff;
+      color: #58a6ff;
+    }
+
+    /* Financials output */
+    .financials-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+    .fin-item {
+      background: #0d1117;
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .fin-item.full-width {
+      grid-column: 1 / -1;
+    }
+    .fin-label {
+      font-size: 11px;
+      color: #8b949e;
+      text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .fin-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      margin-top: 4px;
+    }
+    .fin-value.green { color: #3fb950; }
+    .fin-value.blue { color: #58a6ff; }
+    .fin-value.yellow { color: #d29922; }
+    .fin-value.red { color: #f85149; }
+
+    /* Guardrail warnings */
+    .guardrail-warning {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 8px;
+    }
+    .guardrail-warning.warning {
+      background: #2d2000;
+      border: 1px solid #d29922;
+      color: #d29922;
+    }
+    .guardrail-warning.hard_block {
+      background: #2d0000;
+      border: 1px solid #f85149;
+      color: #f85149;
+    }
+    .guardrail-warning:last-child { margin-bottom: 0; }
+    .guardrail-icon { font-size: 16px; flex-shrink: 0; }
+
+    /* Finalize button */
+    .finalize-btn {
+      width: 100%;
+      padding: 14px;
+      background: #238636;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background 0.2s;
+    }
+    .finalize-btn:hover { background: #2ea043; }
+    .finalize-btn:disabled {
+      background: #21262d;
+      color: #484f58;
+      cursor: not-allowed;
+    }
+
+    /* Tier table */
+    .tier-table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    .tier-table th {
+      font-size: 11px;
+      color: #8b949e;
+      text-align: left;
+      padding: 4px 8px 8px;
+      font-weight: 500;
+    }
+    .tier-table td { padding: 4px 8px; }
+    .tier-table input {
+      width: 100%;
+      padding: 8px;
+      background: #0d1117;
+      border: 1px solid #30363d;
+      border-radius: 6px;
+      color: #e1e4e8;
+      font-size: 14px;
+    }
+    .tier-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .tier-btn {
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      border: 1px solid #30363d;
+      background: #0d1117;
+      color: #8b949e;
+    }
+    .tier-btn:hover { border-color: #58a6ff; color: #58a6ff; }
+    .tier-btn.remove { color: #f85149; }
+
+    /* Input with prefix/suffix */
+    .input-wrap {
+      position: relative;
+    }
+    .input-prefix {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #484f58;
+      font-size: 15px;
+    }
+    .input-wrap input {
+      padding-left: 24px;
+    }
+
+    /* Margin indicator bar */
+    .margin-bar-container {
+      margin-top: 6px;
+    }
+    .margin-bar {
+      height: 6px;
+      border-radius: 3px;
+      background: #30363d;
+      overflow: hidden;
+    }
+    .margin-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s, background 0.3s;
+    }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useMemo } = React;
+
+    const DEAL_TYPES = [
+      { value: "rev_share", label: "Revenue Share" },
+      { value: "flat_fee", label: "Flat Fee" },
+      { value: "hybrid", label: "Hybrid (Rev Share + Flat Fee)" },
+      { value: "tiered", label: "Tiered" },
+      { value: "usage_based", label: "Usage-Based" },
+    ];
+
+    const PAYMENT_OPTIONS = [
+      { value: "net_30", label: "Net 30" },
+      { value: "net_45", label: "Net 45" },
+      { value: "net_60", label: "Net 60" },
+      { value: "net_90", label: "Net 90" },
+    ];
+
+    const GEO_OPTIONS = ["US", "EU", "APAC", "LATAM", "MEA", "Global"];
+
+    const DURATION_OPTIONS = [3, 6, 12, 18, 24, 36];
+
+    // -- Calculator logic (mirrors Python engine) --
+
+    function computeFinancials(terms) {
+      const grossMonthly = terms.monthlyVolume * terms.avgDealValue;
+
+      let monthlyPayout = 0;
+      if (terms.dealType === "rev_share") {
+        monthlyPayout = grossMonthly * (terms.revSharePct / 100);
+      } else if (terms.dealType === "flat_fee") {
+        monthlyPayout = terms.flatFeeMonthly;
+      } else if (terms.dealType === "hybrid") {
+        monthlyPayout = grossMonthly * (terms.revSharePct / 100) + terms.flatFeeMonthly;
+      } else if (terms.dealType === "tiered") {
+        let remaining = terms.monthlyVolume;
+        const sorted = [...terms.tieredRates].sort((a, b) => a.volumeMin - b.volumeMin);
+        for (const tier of sorted) {
+          if (remaining <= 0) break;
+          const tierMax = tier.volumeMax ?? Infinity;
+          const tierCap = tierMax - tier.volumeMin;
+          const tierVol = Math.min(remaining, tierCap);
+          monthlyPayout += tierVol * terms.avgDealValue * (tier.ratePct / 100);
+          remaining -= tierVol;
+        }
+      } else if (terms.dealType === "usage_based") {
+        monthlyPayout = terms.monthlyVolume * terms.perUnitRate;
+      }
+
+      const monthlyNet = grossMonthly - monthlyPayout;
+      const marginPct = grossMonthly > 0 ? (monthlyNet / grossMonthly) * 100 : 0;
+      const annualPayout = monthlyPayout * Math.min(terms.durationMonths, 12);
+      const annualNet = monthlyNet * Math.min(terms.durationMonths, 12);
+      const totalDealValue = monthlyPayout * terms.durationMonths;
+      const totalNet = monthlyNet * terms.durationMonths;
+
+      let breakevenMonths = null;
+      if (monthlyNet > 0 && terms.acquisitionCost > 0) {
+        breakevenMonths = Math.ceil(terms.acquisitionCost / monthlyNet);
+      } else if (terms.acquisitionCost === 0 && monthlyNet > 0) {
+        breakevenMonths = 0;
+      }
+
+      return {
+        grossMonthly, monthlyPayout, monthlyNet, marginPct,
+        annualPayout, annualNet, totalDealValue, totalNet, breakevenMonths,
+      };
+    }
+
+    // -- Guardrail checks --
+
+    const GUARDRAILS = {
+      rev_share_pct: { min: 5, max: 30 },
+      flat_fee_monthly: { min: 500, max: 25000 },
+      deal_duration: { min: 3, max: 36 },
+      payment_terms: { allowed: ["net_30", "net_45", "net_60", "net_90"] },
+      total_deal_value: { max: 1000000 },
+      margin_pct: { min: 20 },
+    };
+
+    function checkGuardrails(terms, financials) {
+      const breaches = [];
+
+      if (terms.revSharePct > 0) {
+        const g = GUARDRAILS.rev_share_pct;
+        if (terms.revSharePct < g.min)
+          breaches.push({ field: "rev_share_pct", level: "warning", message: `Rev share ${terms.revSharePct}% is below minimum ${g.min}%` });
+        else if (terms.revSharePct > g.max)
+          breaches.push({ field: "rev_share_pct", level: "warning", message: `Rev share ${terms.revSharePct}% exceeds maximum ${g.max}%` });
+      }
+
+      if (terms.flatFeeMonthly > 0) {
+        const g = GUARDRAILS.flat_fee_monthly;
+        if (terms.flatFeeMonthly < g.min)
+          breaches.push({ field: "flat_fee", level: "warning", message: `Flat fee $${terms.flatFeeMonthly.toLocaleString()}/mo is below minimum $${g.min.toLocaleString()}/mo` });
+        else if (terms.flatFeeMonthly > g.max)
+          breaches.push({ field: "flat_fee", level: "warning", message: `Flat fee $${terms.flatFeeMonthly.toLocaleString()}/mo exceeds maximum $${g.max.toLocaleString()}/mo` });
+      }
+
+      const gd = GUARDRAILS.deal_duration;
+      if (terms.durationMonths < gd.min)
+        breaches.push({ field: "duration", level: "warning", message: `Duration ${terms.durationMonths}mo is below minimum ${gd.min}mo` });
+      else if (terms.durationMonths > gd.max)
+        breaches.push({ field: "duration", level: "warning", message: `Duration ${terms.durationMonths}mo exceeds maximum ${gd.max}mo` });
+
+      if (!GUARDRAILS.payment_terms.allowed.includes(terms.paymentTerms))
+        breaches.push({ field: "payment", level: "hard_block", message: `Payment terms '${terms.paymentTerms}' not allowed. Max is Net 90.` });
+
+      if (financials.totalDealValue > GUARDRAILS.total_deal_value.max)
+        breaches.push({ field: "total_value", level: "warning", message: `Total deal value $${Math.round(financials.totalDealValue).toLocaleString()} exceeds $${GUARDRAILS.total_deal_value.max.toLocaleString()} threshold` });
+
+      if (financials.grossMonthly > 0 && financials.marginPct < GUARDRAILS.margin_pct.min)
+        breaches.push({ field: "margin", level: "warning", message: `Margin ${financials.marginPct.toFixed(1)}% is below minimum ${GUARDRAILS.margin_pct.min}%` });
+
+      return breaches;
+    }
+
+    // -- Formatting --
+    const fmt = (n) => "$" + Math.round(n).toLocaleString();
+    const fmtPct = (n) => n.toFixed(1) + "%";
+
+    // -- App --
+    function App() {
+      const [partnerName, setPartnerName] = useState("Acme Corp");
+      const [dealType, setDealType] = useState("rev_share");
+      const [revSharePct, setRevSharePct] = useState(15);
+      const [flatFeeMonthly, setFlatFeeMonthly] = useState(5000);
+      const [perUnitRate, setPerUnitRate] = useState(2.50);
+      const [durationMonths, setDurationMonths] = useState(12);
+      const [geoScope, setGeoScope] = useState(["US"]);
+      const [exclusivity, setExclusivity] = useState(false);
+      const [paymentTerms, setPaymentTerms] = useState("net_30");
+      const [monthlyVolume, setMonthlyVolume] = useState(1000);
+      const [avgDealValue, setAvgDealValue] = useState(50);
+      const [acquisitionCost, setAcquisitionCost] = useState(10000);
+      const [tieredRates, setTieredRates] = useState([
+        { volumeMin: 0, volumeMax: 100, ratePct: 20 },
+        { volumeMin: 100, volumeMax: 500, ratePct: 15 },
+        { volumeMin: 500, volumeMax: null, ratePct: 10 },
+      ]);
+
+      const terms = {
+        dealType, revSharePct, flatFeeMonthly, perUnitRate,
+        durationMonths, geoScope, exclusivity, paymentTerms,
+        monthlyVolume, avgDealValue, acquisitionCost, tieredRates,
+      };
+
+      const financials = useMemo(() => computeFinancials(terms), [
+        dealType, revSharePct, flatFeeMonthly, perUnitRate,
+        durationMonths, monthlyVolume, avgDealValue, acquisitionCost,
+        JSON.stringify(tieredRates),
+      ]);
+
+      const breaches = useMemo(() => checkGuardrails(terms, financials), [
+        terms, financials,
+      ]);
+
+      const hasHardBlock = breaches.some(b => b.level === "hard_block");
+
+      const toggleGeo = (geo) => {
+        if (geo === "Global") {
+          setGeoScope(geoScope.includes("Global") ? [] : ["Global"]);
+        } else {
+          let next = geoScope.filter(g => g !== "Global");
+          if (next.includes(geo)) next = next.filter(g => g !== geo);
+          else next.push(geo);
+          setGeoScope(next);
+        }
+      };
+
+      const showRevShare = ["rev_share", "hybrid"].includes(dealType);
+      const showFlatFee = ["flat_fee", "hybrid"].includes(dealType);
+      const showTiered = dealType === "tiered";
+      const showUsage = dealType === "usage_based";
+
+      const marginColor = financials.marginPct >= 50 ? "green"
+        : financials.marginPct >= 20 ? "blue"
+        : financials.marginPct >= 0 ? "yellow" : "red";
+
+      return (
+        <div className="app">
+          <div className="header">
+            <h1>Deal Calculator</h1>
+            <p>Configure deal terms and see financials in real-time</p>
+          </div>
+
+          {/* Partner & Deal Type */}
+          <div className="card">
+            <div className="card-title">Deal Setup</div>
+            <div className="field">
+              <label>Partner Name</label>
+              <input value={partnerName} onChange={e => setPartnerName(e.target.value)} placeholder="e.g. Acme Corp" />
+            </div>
+            <div className="field">
+              <label>Deal Type</label>
+              <select value={dealType} onChange={e => setDealType(e.target.value)}>
+                {DEAL_TYPES.map(dt => <option key={dt.value} value={dt.value}>{dt.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Deal Terms */}
+          <div className="card">
+            <div className="card-title">Deal Terms</div>
+
+            {showRevShare && (
+              <div className="field">
+                <label>Revenue Share %</label>
+                <div className="slider-row">
+                  <input type="range" min="1" max="50" step="0.5" value={revSharePct}
+                    onChange={e => setRevSharePct(parseFloat(e.target.value))} />
+                  <span className="slider-value">{revSharePct}%</span>
+                </div>
+              </div>
+            )}
+
+            {showFlatFee && (
+              <div className="field">
+                <label>Flat Fee ($/month)</label>
+                <div className="input-wrap">
+                  <span className="input-prefix">$</span>
+                  <input type="number" value={flatFeeMonthly}
+                    onChange={e => setFlatFeeMonthly(parseFloat(e.target.value) || 0)} />
+                </div>
+              </div>
+            )}
+
+            {showUsage && (
+              <div className="field">
+                <label>Per-Unit Rate ($)</label>
+                <div className="input-wrap">
+                  <span className="input-prefix">$</span>
+                  <input type="number" step="0.01" value={perUnitRate}
+                    onChange={e => setPerUnitRate(parseFloat(e.target.value) || 0)} />
+                </div>
+              </div>
+            )}
+
+            {showTiered && (
+              <div className="field">
+                <label>Tiered Rates</label>
+                <table className="tier-table">
+                  <thead>
+                    <tr><th>From</th><th>To</th><th>Rate %</th></tr>
+                  </thead>
+                  <tbody>
+                    {tieredRates.map((tier, i) => (
+                      <tr key={i}>
+                        <td><input type="number" value={tier.volumeMin} onChange={e => {
+                          const next = [...tieredRates];
+                          next[i] = { ...next[i], volumeMin: parseInt(e.target.value) || 0 };
+                          setTieredRates(next);
+                        }} /></td>
+                        <td><input type="number" placeholder="unlimited" value={tier.volumeMax ?? ""}
+                          onChange={e => {
+                            const next = [...tieredRates];
+                            next[i] = { ...next[i], volumeMax: e.target.value ? parseInt(e.target.value) : null };
+                            setTieredRates(next);
+                          }} /></td>
+                        <td><input type="number" step="0.5" value={tier.ratePct} onChange={e => {
+                          const next = [...tieredRates];
+                          next[i] = { ...next[i], ratePct: parseFloat(e.target.value) || 0 };
+                          setTieredRates(next);
+                        }} /></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="tier-actions">
+                  <button className="tier-btn" onClick={() => {
+                    const last = tieredRates[tieredRates.length - 1];
+                    setTieredRates([...tieredRates, { volumeMin: last?.volumeMax || 0, volumeMax: null, ratePct: 10 }]);
+                  }}>+ Add Tier</button>
+                  {tieredRates.length > 1 && (
+                    <button className="tier-btn remove" onClick={() => setTieredRates(tieredRates.slice(0, -1))}>Remove Last</button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="field">
+              <label>Deal Duration</label>
+              <select value={durationMonths} onChange={e => setDurationMonths(parseInt(e.target.value))}>
+                {DURATION_OPTIONS.map(d => <option key={d} value={d}>{d} months</option>)}
+              </select>
+            </div>
+
+            <div className="field">
+              <label>Geo Scope</label>
+              <div className="chips">
+                {GEO_OPTIONS.map(geo => (
+                  <span key={geo} className={`chip ${geoScope.includes(geo) ? "active" : ""}`}
+                    onClick={() => toggleGeo(geo)}>{geo}</span>
+                ))}
+              </div>
+            </div>
+
+            <div className="field">
+              <div className="toggle-row">
+                <label>Exclusivity</label>
+                <label className="toggle">
+                  <input type="checkbox" checked={exclusivity} onChange={e => setExclusivity(e.target.checked)} />
+                  <div className="toggle-track"></div>
+                  <div className="toggle-thumb"></div>
+                </label>
+              </div>
+            </div>
+
+            <div className="field">
+              <label>Payment Terms</label>
+              <select value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)}>
+                {PAYMENT_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Volume & Revenue */}
+          <div className="card">
+            <div className="card-title">Volume & Revenue</div>
+            <div className="field">
+              <label>Estimated Monthly Volume (units)</label>
+              <input type="number" value={monthlyVolume}
+                onChange={e => setMonthlyVolume(parseInt(e.target.value) || 0)} />
+            </div>
+            <div className="field">
+              <label>Avg Deal Value ($/unit)</label>
+              <div className="input-wrap">
+                <span className="input-prefix">$</span>
+                <input type="number" step="0.01" value={avgDealValue}
+                  onChange={e => setAvgDealValue(parseFloat(e.target.value) || 0)} />
+              </div>
+            </div>
+            <div className="field">
+              <label>Partner Acquisition Cost (one-time)</label>
+              <div className="input-wrap">
+                <span className="input-prefix">$</span>
+                <input type="number" value={acquisitionCost}
+                  onChange={e => setAcquisitionCost(parseFloat(e.target.value) || 0)} />
+              </div>
+            </div>
+          </div>
+
+          {/* Guardrail Warnings */}
+          {breaches.length > 0 && (
+            <div className="card">
+              <div className="card-title">Guardrail Alerts</div>
+              {breaches.map((b, i) => (
+                <div key={i} className={`guardrail-warning ${b.level}`}>
+                  <span className="guardrail-icon">{b.level === "hard_block" ? "\u26d4" : "\u26a0\ufe0f"}</span>
+                  <span>{b.message}</span>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Financial Output */}
+          <div className="card">
+            <div className="card-title">Financials</div>
+            <div className="financials-grid">
+              <div className="fin-item">
+                <div className="fin-label">Gross Monthly Rev</div>
+                <div className="fin-value">{fmt(financials.grossMonthly)}</div>
+              </div>
+              <div className="fin-item">
+                <div className="fin-label">Monthly Payout</div>
+                <div className="fin-value yellow">{fmt(financials.monthlyPayout)}</div>
+              </div>
+              <div className="fin-item">
+                <div className="fin-label">Monthly Net Rev</div>
+                <div className="fin-value green">{fmt(financials.monthlyNet)}</div>
+              </div>
+              <div className="fin-item">
+                <div className="fin-label">Margin</div>
+                <div className={`fin-value ${marginColor}`}>{fmtPct(financials.marginPct)}</div>
+                <div className="margin-bar-container">
+                  <div className="margin-bar">
+                    <div className="margin-bar-fill" style={{
+                      width: `${Math.max(0, Math.min(100, financials.marginPct))}%`,
+                      background: marginColor === "green" ? "#3fb950"
+                        : marginColor === "blue" ? "#58a6ff"
+                        : marginColor === "yellow" ? "#d29922" : "#f85149",
+                    }}></div>
+                  </div>
+                </div>
+              </div>
+              <div className="fin-item">
+                <div className="fin-label">Annual Payout</div>
+                <div className="fin-value">{fmt(financials.annualPayout)}</div>
+              </div>
+              <div className="fin-item">
+                <div className="fin-label">Annual Net Rev</div>
+                <div className="fin-value green">{fmt(financials.annualNet)}</div>
+              </div>
+              <div className="fin-item">
+                <div className="fin-label">Total Deal Value</div>
+                <div className="fin-value blue">{fmt(financials.totalDealValue)}</div>
+              </div>
+              <div className="fin-item">
+                <div className="fin-label">Breakeven</div>
+                <div className="fin-value">
+                  {financials.breakevenMonths === null ? "N/A"
+                    : financials.breakevenMonths === 0 ? "Instant"
+                    : `${financials.breakevenMonths} mo`}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Finalize */}
+          <button className="finalize-btn" disabled={hasHardBlock}
+            onClick={() => alert(`Deal with ${partnerName} finalized!\n\nTotal value: ${fmt(financials.totalDealValue)}\nMargin: ${fmtPct(financials.marginPct)}`)}>
+            {hasHardBlock ? "Cannot Finalize — Fix Guardrail Violations" : "Finalize Deal"}
+          </button>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
