@@ -1,172 +1,149 @@
-"""Tests for calculator_engine.py"""
+"""Tests for gaming partner calculator_engine.py"""
 
 import pytest
-from calculator_engine import (
-    DealType, DealTerms, TierRate,
-    compute_gross_monthly_revenue,
-    compute_monthly_partner_payout,
-    compute_financials,
-)
+from calculator_engine import DealTerms, BonusTier, compute_bonus, compute_financials
 
 
 def make_terms(**overrides) -> DealTerms:
     defaults = dict(
-        partner_name="Test Corp",
-        deal_type=DealType.REV_SHARE,
-        rev_share_pct=15.0,
-        monthly_volume=1000,
-        avg_deal_value=50.0,
-        deal_duration_months=12,
-        acquisition_cost=10000.0,
+        partner_name="Test Partner",
+        monthly_new_players=10000,
+        cost_per_player=8.0,
+        monthly_spend_per_player=25.0,
+        player_retention_months=6.0,
+        profit_share_pct=15.0,
+        contract_duration_months=12,
+        bonus_tiers=[],
     )
     defaults.update(overrides)
     return DealTerms(**defaults)
 
 
-class TestGrossRevenue:
-    def test_basic(self):
-        terms = make_terms(monthly_volume=1000, avg_deal_value=50.0)
-        assert compute_gross_monthly_revenue(terms) == 50_000.0
+class TestBasicFinancials:
+    def test_active_players(self):
+        f = compute_financials(make_terms(monthly_new_players=10000, player_retention_months=6))
+        assert f.active_players == 60_000
 
-    def test_zero_volume(self):
-        terms = make_terms(monthly_volume=0)
-        assert compute_gross_monthly_revenue(terms) == 0.0
+    def test_monthly_revenue(self):
+        f = compute_financials(make_terms())
+        # 10k players * 6 months retention * $25 ARPU = $1,500,000
+        assert f.monthly_revenue == 1_500_000.0
 
-    def test_zero_value(self):
-        terms = make_terms(avg_deal_value=0.0)
-        assert compute_gross_monthly_revenue(terms) == 0.0
+    def test_monthly_cpa_cost(self):
+        f = compute_financials(make_terms())
+        # 10k * $8 = $80,000
+        assert f.monthly_cpa_cost == 80_000.0
 
+    def test_monthly_profit_share(self):
+        f = compute_financials(make_terms())
+        # $1,500,000 * 15% = $225,000
+        assert f.monthly_profit_share == 225_000.0
 
-class TestRevShare:
-    def test_basic(self):
-        terms = make_terms(deal_type=DealType.REV_SHARE, rev_share_pct=15.0)
-        gross = compute_gross_monthly_revenue(terms)  # 50,000
-        payout = compute_monthly_partner_payout(terms, gross)
-        assert payout == 7_500.0
+    def test_monthly_profit(self):
+        f = compute_financials(make_terms())
+        # revenue ($1.5M) - CPA ($80k) - profit share ($225k) = $1,195,000
+        assert f.monthly_profit == 1_195_000.0
 
-    def test_full_financials(self):
-        terms = make_terms(deal_type=DealType.REV_SHARE, rev_share_pct=20.0)
-        f = compute_financials(terms)
-        assert f.gross_monthly_revenue == 50_000.0
-        assert f.monthly_partner_payout == 10_000.0
-        assert f.monthly_net_revenue == 40_000.0
-        assert f.margin_pct == 80.0
-        assert f.annual_partner_payout == 120_000.0
-        assert f.total_deal_value == 120_000.0
-
-
-class TestFlatFee:
-    def test_basic(self):
-        terms = make_terms(deal_type=DealType.FLAT_FEE, flat_fee_monthly=5000.0)
-        gross = compute_gross_monthly_revenue(terms)
-        payout = compute_monthly_partner_payout(terms, gross)
-        assert payout == 5_000.0
-
-    def test_financials(self):
-        terms = make_terms(deal_type=DealType.FLAT_FEE, flat_fee_monthly=5000.0)
-        f = compute_financials(terms)
-        assert f.monthly_partner_payout == 5_000.0
-        assert f.monthly_net_revenue == 45_000.0
-        assert f.margin_pct == 90.0
+    def test_margin(self):
+        f = compute_financials(make_terms())
+        # $1,195,000 / $1,500,000 = 79.67%
+        assert round(f.margin_pct, 2) == 79.67
 
 
-class TestHybrid:
-    def test_basic(self):
-        terms = make_terms(
-            deal_type=DealType.HYBRID,
-            rev_share_pct=10.0,
-            flat_fee_monthly=2000.0,
-        )
-        gross = compute_gross_monthly_revenue(terms)  # 50,000
-        payout = compute_monthly_partner_payout(terms, gross)
-        assert payout == 7_000.0  # 5,000 (10% of 50k) + 2,000
+class TestLTV:
+    def test_ltv_per_player(self):
+        f = compute_financials(make_terms(monthly_spend_per_player=25, player_retention_months=6))
+        assert f.ltv_per_player == 150.0
+
+    def test_cac(self):
+        f = compute_financials(make_terms(cost_per_player=8))
+        assert f.cac == 8.0
+
+    def test_ltv_cac_ratio(self):
+        f = compute_financials(make_terms(monthly_spend_per_player=25, player_retention_months=6, cost_per_player=8))
+        # LTV=150, CAC=8, ratio=18.75
+        assert f.ltv_cac_ratio == 18.75
+
+    def test_ltv_cac_zero_cac(self):
+        f = compute_financials(make_terms(cost_per_player=0))
+        assert f.ltv_cac_ratio is None
 
 
-class TestTiered:
-    def test_basic(self):
-        terms = make_terms(
-            deal_type=DealType.TIERED,
-            monthly_volume=500,
-            avg_deal_value=50.0,
-            tiered_rates=[
-                TierRate(volume_min=0, volume_max=100, rate_pct=20.0),
-                TierRate(volume_min=100, volume_max=500, rate_pct=15.0),
-                TierRate(volume_min=500, volume_max=None, rate_pct=10.0),
-            ],
-        )
-        gross = compute_gross_monthly_revenue(terms)  # 25,000
-        payout = compute_monthly_partner_payout(terms, gross)
-        # Tier 1: 100 units * $50 * 20% = $1,000
-        # Tier 2: 400 units * $50 * 15% = $3,000
-        # Total: $4,000
-        assert payout == 4_000.0
+class TestBonusTiers:
+    def test_no_tiers(self):
+        assert compute_bonus(1_000_000, []) == 0.0
+
+    def test_below_all_tiers(self):
+        tiers = [BonusTier(revenue_threshold=500_000, bonus_pct=2)]
+        assert compute_bonus(400_000, tiers) == 0.0
+
+    def test_single_tier(self):
+        tiers = [BonusTier(revenue_threshold=500_000, bonus_pct=2)]
+        # Revenue 1M: 500k above threshold * 2% = $10,000
+        assert compute_bonus(1_000_000, tiers) == 10_000.0
+
+    def test_multiple_tiers(self):
+        tiers = [
+            BonusTier(revenue_threshold=500_000, bonus_pct=2),
+            BonusTier(revenue_threshold=1_500_000, bonus_pct=3),
+            BonusTier(revenue_threshold=5_000_000, bonus_pct=5),
+        ]
+        # Revenue = 2M
+        # Band 500k-1.5M: 1M * 2% = $20,000
+        # Band 1.5M-2M: 500k * 3% = $15,000
+        # Total: $35,000
+        assert compute_bonus(2_000_000, tiers) == 35_000.0
 
     def test_exceeds_all_tiers(self):
+        tiers = [
+            BonusTier(revenue_threshold=500_000, bonus_pct=2),
+            BonusTier(revenue_threshold=1_500_000, bonus_pct=3),
+        ]
+        # Revenue = 3M
+        # Band 500k-1.5M: 1M * 2% = $20,000
+        # Band 1.5M+: 1.5M * 3% = $45,000
+        # Total: $65,000
+        assert compute_bonus(3_000_000, tiers) == 65_000.0
+
+    def test_bonus_in_financials(self):
         terms = make_terms(
-            deal_type=DealType.TIERED,
-            monthly_volume=1000,
-            avg_deal_value=50.0,
-            tiered_rates=[
-                TierRate(volume_min=0, volume_max=100, rate_pct=20.0),
-                TierRate(volume_min=100, volume_max=500, rate_pct=15.0),
-                TierRate(volume_min=500, volume_max=None, rate_pct=10.0),
-            ],
+            monthly_new_players=10000,
+            monthly_spend_per_player=25,
+            player_retention_months=6,
+            bonus_tiers=[BonusTier(revenue_threshold=500_000, bonus_pct=2)],
         )
-        gross = compute_gross_monthly_revenue(terms)
-        payout = compute_monthly_partner_payout(terms, gross)
-        # Tier 1: 100 * $50 * 20% = $1,000
-        # Tier 2: 400 * $50 * 15% = $3,000
-        # Tier 3: 500 * $50 * 10% = $2,500
-        # Total: $6,500
-        assert payout == 6_500.0
-
-
-class TestUsageBased:
-    def test_basic(self):
-        terms = make_terms(
-            deal_type=DealType.USAGE_BASED,
-            monthly_volume=1000,
-            per_unit_rate=2.50,
-        )
-        gross = compute_gross_monthly_revenue(terms)
-        payout = compute_monthly_partner_payout(terms, gross)
-        assert payout == 2_500.0
-
-
-class TestBreakeven:
-    def test_basic(self):
-        terms = make_terms(acquisition_cost=10_000.0)
         f = compute_financials(terms)
-        # Net monthly = 50,000 - 7,500 = 42,500
-        # Breakeven = ceil(10,000 / 42,500) = 1 month
-        assert f.breakeven_months == 1
-
-    def test_no_acquisition_cost(self):
-        terms = make_terms(acquisition_cost=0.0)
-        f = compute_financials(terms)
-        assert f.breakeven_months == 0
-
-    def test_high_acquisition_cost(self):
-        terms = make_terms(acquisition_cost=200_000.0)
-        f = compute_financials(terms)
-        # Net monthly = 42,500. ceil(200,000/42,500) = 5
-        assert f.breakeven_months == 5
-
-    def test_zero_net_revenue(self):
-        terms = make_terms(rev_share_pct=100.0, acquisition_cost=10_000.0)
-        f = compute_financials(terms)
-        assert f.breakeven_months is None
+        # Revenue = $1.5M, bonus = (1.5M - 500k) * 2% = $20,000
+        assert f.monthly_bonus == 20_000.0
 
 
-class TestDuration:
-    def test_short_duration(self):
-        terms = make_terms(deal_duration_months=6)
-        f = compute_financials(terms)
-        assert f.total_deal_value == f.monthly_partner_payout * 6
-        assert f.annual_partner_payout == f.monthly_partner_payout * 6
+class TestContractTotals:
+    def test_total_contract_value(self):
+        f = compute_financials(make_terms(contract_duration_months=12))
+        assert f.total_contract_value == f.monthly_partner_cost * 12
 
-    def test_long_duration(self):
-        terms = make_terms(deal_duration_months=24)
-        f = compute_financials(terms)
-        assert f.total_deal_value == f.monthly_partner_payout * 24
-        assert f.annual_partner_payout == f.monthly_partner_payout * 12
+    def test_total_profit(self):
+        f = compute_financials(make_terms(contract_duration_months=12))
+        assert f.total_profit == f.monthly_profit * 12
+
+    def test_short_contract(self):
+        f = compute_financials(make_terms(contract_duration_months=3))
+        assert f.total_contract_value == f.monthly_partner_cost * 3
+
+
+class TestEdgeCases:
+    def test_zero_players(self):
+        f = compute_financials(make_terms(monthly_new_players=0))
+        assert f.monthly_revenue == 0.0
+        assert f.monthly_profit == 0.0
+        assert f.margin_pct == 0.0
+
+    def test_zero_spend(self):
+        f = compute_financials(make_terms(monthly_spend_per_player=0))
+        assert f.monthly_revenue == 0.0
+        assert f.ltv_per_player == 0.0
+
+    def test_zero_retention(self):
+        f = compute_financials(make_terms(player_retention_months=0))
+        assert f.active_players == 0.0
+        assert f.monthly_revenue == 0.0

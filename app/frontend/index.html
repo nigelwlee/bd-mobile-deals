@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Deal Calculator</title>
+  <title>Partner Deal Calculator</title>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
@@ -23,7 +23,6 @@
       padding-bottom: 100px;
     }
 
-    /* Header */
     .header {
       text-align: center;
       padding: 24px 0 16px;
@@ -39,7 +38,6 @@
       margin-top: 4px;
     }
 
-    /* Cards */
     .card {
       background: #161b22;
       border: 1px solid #30363d;
@@ -56,7 +54,6 @@
       margin-bottom: 12px;
     }
 
-    /* Form fields */
     .field {
       margin-bottom: 14px;
     }
@@ -85,7 +82,6 @@
       border-color: #58a6ff;
     }
 
-    /* Slider */
     .slider-row {
       display: flex;
       align-items: center;
@@ -116,63 +112,19 @@
       color: #58a6ff;
     }
 
-    /* Toggle */
-    .toggle-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
-    .toggle {
+    .input-wrap {
       position: relative;
-      width: 44px;
-      height: 24px;
-      cursor: pointer;
     }
-    .toggle input { display: none; }
-    .toggle-track {
+    .input-prefix {
       position: absolute;
-      inset: 0;
-      background: #30363d;
-      border-radius: 12px;
-      transition: background 0.2s;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #484f58;
+      font-size: 15px;
     }
-    .toggle input:checked + .toggle-track {
-      background: #58a6ff;
-    }
-    .toggle-thumb {
-      position: absolute;
-      top: 2px;
-      left: 2px;
-      width: 20px;
-      height: 20px;
-      background: #fff;
-      border-radius: 50%;
-      transition: transform 0.2s;
-    }
-    .toggle input:checked ~ .toggle-thumb {
-      transform: translateX(20px);
-    }
-
-    /* Geo chips */
-    .chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-    }
-    .chip {
-      padding: 6px 12px;
-      border-radius: 16px;
-      font-size: 13px;
-      cursor: pointer;
-      border: 1px solid #30363d;
-      background: #0d1117;
-      color: #8b949e;
-      transition: all 0.2s;
-    }
-    .chip.active {
-      background: #1f3a5f;
-      border-color: #58a6ff;
-      color: #58a6ff;
+    .input-wrap input {
+      padding-left: 24px;
     }
 
     /* Financials output */
@@ -229,28 +181,7 @@
     .guardrail-warning:last-child { margin-bottom: 0; }
     .guardrail-icon { font-size: 16px; flex-shrink: 0; }
 
-    /* Finalize button */
-    .finalize-btn {
-      width: 100%;
-      padding: 14px;
-      background: #238636;
-      color: #fff;
-      border: none;
-      border-radius: 10px;
-      font-size: 16px;
-      font-weight: 600;
-      cursor: pointer;
-      margin-top: 4px;
-      transition: background 0.2s;
-    }
-    .finalize-btn:hover { background: #2ea043; }
-    .finalize-btn:disabled {
-      background: #21262d;
-      color: #484f58;
-      cursor: not-allowed;
-    }
-
-    /* Tier table */
+    /* Bonus tier table */
     .tier-table {
       width: 100%;
       border-collapse: collapse;
@@ -289,23 +220,26 @@
     .tier-btn:hover { border-color: #58a6ff; color: #58a6ff; }
     .tier-btn.remove { color: #f85149; }
 
-    /* Input with prefix/suffix */
-    .input-wrap {
-      position: relative;
+    .finalize-btn {
+      width: 100%;
+      padding: 14px;
+      background: #238636;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 4px;
+      transition: background 0.2s;
     }
-    .input-prefix {
-      position: absolute;
-      left: 12px;
-      top: 50%;
-      transform: translateY(-50%);
+    .finalize-btn:hover { background: #2ea043; }
+    .finalize-btn:disabled {
+      background: #21262d;
       color: #484f58;
-      font-size: 15px;
-    }
-    .input-wrap input {
-      padding-left: 24px;
+      cursor: not-allowed;
     }
 
-    /* Margin indicator bar */
     .margin-bar-container {
       margin-top: 6px;
     }
@@ -320,6 +254,18 @@
       border-radius: 3px;
       transition: width 0.3s, background 0.3s;
     }
+
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 6px 0;
+      font-size: 13px;
+      border-bottom: 1px solid #21262d;
+    }
+    .breakdown-row:last-child { border-bottom: none; }
+    .breakdown-row .label { color: #8b949e; }
+    .breakdown-row .value { color: #c9d1d9; font-weight: 500; }
+    .breakdown-row .value.negative { color: #f85149; }
   </style>
 </head>
 <body>
@@ -328,342 +274,263 @@
   <script type="text/babel">
     const { useState, useMemo } = React;
 
-    const DEAL_TYPES = [
-      { value: "rev_share", label: "Revenue Share" },
-      { value: "flat_fee", label: "Flat Fee" },
-      { value: "hybrid", label: "Hybrid (Rev Share + Flat Fee)" },
-      { value: "tiered", label: "Tiered" },
-      { value: "usage_based", label: "Usage-Based" },
-    ];
-
-    const PAYMENT_OPTIONS = [
-      { value: "net_30", label: "Net 30" },
-      { value: "net_45", label: "Net 45" },
-      { value: "net_60", label: "Net 60" },
-      { value: "net_90", label: "Net 90" },
-    ];
-
-    const GEO_OPTIONS = ["US", "EU", "APAC", "LATAM", "MEA", "Global"];
-
     const DURATION_OPTIONS = [3, 6, 12, 18, 24, 36];
+
+    const DEFAULT_BONUS_TIERS = [
+      { revenueThreshold: 500000, bonusPct: 2 },
+      { revenueThreshold: 1500000, bonusPct: 3 },
+      { revenueThreshold: 5000000, bonusPct: 5 },
+    ];
 
     // -- Calculator logic (mirrors Python engine) --
 
+    function computeBonus(monthlyRevenue, tiers) {
+      if (!tiers.length) return 0;
+      const sorted = [...tiers].sort((a, b) => a.revenueThreshold - b.revenueThreshold);
+      let total = 0;
+      for (let i = 0; i < sorted.length; i++) {
+        if (monthlyRevenue <= sorted[i].revenueThreshold) break;
+        const ceiling = i + 1 < sorted.length ? sorted[i + 1].revenueThreshold : Infinity;
+        const bandRevenue = Math.min(monthlyRevenue, ceiling) - sorted[i].revenueThreshold;
+        total += bandRevenue * (sorted[i].bonusPct / 100);
+      }
+      return total;
+    }
+
     function computeFinancials(terms) {
-      const grossMonthly = terms.monthlyVolume * terms.avgDealValue;
+      const activePlayers = terms.monthlyNewPlayers * terms.playerRetentionMonths;
+      const monthlyRevenue = activePlayers * terms.monthlySpendPerPlayer;
 
-      let monthlyPayout = 0;
-      if (terms.dealType === "rev_share") {
-        monthlyPayout = grossMonthly * (terms.revSharePct / 100);
-      } else if (terms.dealType === "flat_fee") {
-        monthlyPayout = terms.flatFeeMonthly;
-      } else if (terms.dealType === "hybrid") {
-        monthlyPayout = grossMonthly * (terms.revSharePct / 100) + terms.flatFeeMonthly;
-      } else if (terms.dealType === "tiered") {
-        let remaining = terms.monthlyVolume;
-        const sorted = [...terms.tieredRates].sort((a, b) => a.volumeMin - b.volumeMin);
-        for (const tier of sorted) {
-          if (remaining <= 0) break;
-          const tierMax = tier.volumeMax ?? Infinity;
-          const tierCap = tierMax - tier.volumeMin;
-          const tierVol = Math.min(remaining, tierCap);
-          monthlyPayout += tierVol * terms.avgDealValue * (tier.ratePct / 100);
-          remaining -= tierVol;
-        }
-      } else if (terms.dealType === "usage_based") {
-        monthlyPayout = terms.monthlyVolume * terms.perUnitRate;
-      }
+      const monthlyCpaCost = terms.monthlyNewPlayers * terms.costPerPlayer;
+      const monthlyProfitShare = monthlyRevenue * (terms.profitSharePct / 100);
+      const monthlyBonus = computeBonus(monthlyRevenue, terms.bonusTiers);
+      const monthlyPartnerCost = monthlyCpaCost + monthlyProfitShare + monthlyBonus;
 
-      const monthlyNet = grossMonthly - monthlyPayout;
-      const marginPct = grossMonthly > 0 ? (monthlyNet / grossMonthly) * 100 : 0;
-      const annualPayout = monthlyPayout * Math.min(terms.durationMonths, 12);
-      const annualNet = monthlyNet * Math.min(terms.durationMonths, 12);
-      const totalDealValue = monthlyPayout * terms.durationMonths;
-      const totalNet = monthlyNet * terms.durationMonths;
+      const monthlyProfit = monthlyRevenue - monthlyPartnerCost;
+      const marginPct = monthlyRevenue > 0 ? (monthlyProfit / monthlyRevenue) * 100 : 0;
 
-      let breakevenMonths = null;
-      if (monthlyNet > 0 && terms.acquisitionCost > 0) {
-        breakevenMonths = Math.ceil(terms.acquisitionCost / monthlyNet);
-      } else if (terms.acquisitionCost === 0 && monthlyNet > 0) {
-        breakevenMonths = 0;
-      }
+      const ltv = terms.monthlySpendPerPlayer * terms.playerRetentionMonths;
+      const cac = terms.costPerPlayer;
+      const ltvCacRatio = cac > 0 ? ltv / cac : null;
+
+      const totalContractValue = monthlyPartnerCost * terms.contractDurationMonths;
+      const totalRevenue = monthlyRevenue * terms.contractDurationMonths;
+      const totalProfit = monthlyProfit * terms.contractDurationMonths;
 
       return {
-        grossMonthly, monthlyPayout, monthlyNet, marginPct,
-        annualPayout, annualNet, totalDealValue, totalNet, breakevenMonths,
+        monthlyNewPlayers: terms.monthlyNewPlayers,
+        activePlayers,
+        monthlyRevenue,
+        monthlyCpaCost,
+        monthlyProfitShare,
+        monthlyBonus,
+        monthlyPartnerCost,
+        monthlyProfit,
+        marginPct,
+        ltv,
+        cac,
+        ltvCacRatio,
+        totalContractValue,
+        totalRevenue,
+        totalProfit,
       };
     }
 
-    // -- Guardrail checks --
+    // -- Guardrails --
 
     const GUARDRAILS = {
-      rev_share_pct: { min: 5, max: 30 },
-      flat_fee_monthly: { min: 500, max: 25000 },
-      deal_duration: { min: 3, max: 36 },
-      payment_terms: { allowed: ["net_30", "net_45", "net_60", "net_90"] },
-      total_deal_value: { max: 1000000 },
-      margin_pct: { min: 20 },
+      cost_per_player: { min: 0.5, max: 50 },
+      profit_share_pct: { min: 5, max: 40 },
+      contract_duration: { min: 3, max: 36 },
+      ltv_cac_ratio: { min: 3 },
+      margin_pct: { min: 30 },
+      total_contract_value: { max: 10000000 },
     };
 
     function checkGuardrails(terms, financials) {
       const breaches = [];
 
-      if (terms.revSharePct > 0) {
-        const g = GUARDRAILS.rev_share_pct;
-        if (terms.revSharePct < g.min)
-          breaches.push({ field: "rev_share_pct", level: "warning", message: `Rev share ${terms.revSharePct}% is below minimum ${g.min}%` });
-        else if (terms.revSharePct > g.max)
-          breaches.push({ field: "rev_share_pct", level: "warning", message: `Rev share ${terms.revSharePct}% exceeds maximum ${g.max}%` });
+      if (terms.costPerPlayer > 0) {
+        const g = GUARDRAILS.cost_per_player;
+        if (terms.costPerPlayer < g.min)
+          breaches.push({ level: "warning", message: `CPA $${terms.costPerPlayer.toFixed(2)} is below minimum $${g.min.toFixed(2)}` });
+        else if (terms.costPerPlayer > g.max)
+          breaches.push({ level: "warning", message: `CPA $${terms.costPerPlayer.toFixed(2)} exceeds maximum $${g.max.toFixed(2)}` });
       }
 
-      if (terms.flatFeeMonthly > 0) {
-        const g = GUARDRAILS.flat_fee_monthly;
-        if (terms.flatFeeMonthly < g.min)
-          breaches.push({ field: "flat_fee", level: "warning", message: `Flat fee $${terms.flatFeeMonthly.toLocaleString()}/mo is below minimum $${g.min.toLocaleString()}/mo` });
-        else if (terms.flatFeeMonthly > g.max)
-          breaches.push({ field: "flat_fee", level: "warning", message: `Flat fee $${terms.flatFeeMonthly.toLocaleString()}/mo exceeds maximum $${g.max.toLocaleString()}/mo` });
+      if (terms.profitSharePct > 0) {
+        const g = GUARDRAILS.profit_share_pct;
+        if (terms.profitSharePct < g.min)
+          breaches.push({ level: "warning", message: `Profit share ${terms.profitSharePct}% is below minimum ${g.min}%` });
+        else if (terms.profitSharePct > g.max)
+          breaches.push({ level: "warning", message: `Profit share ${terms.profitSharePct}% exceeds maximum ${g.max}%` });
       }
 
-      const gd = GUARDRAILS.deal_duration;
-      if (terms.durationMonths < gd.min)
-        breaches.push({ field: "duration", level: "warning", message: `Duration ${terms.durationMonths}mo is below minimum ${gd.min}mo` });
-      else if (terms.durationMonths > gd.max)
-        breaches.push({ field: "duration", level: "warning", message: `Duration ${terms.durationMonths}mo exceeds maximum ${gd.max}mo` });
+      const gd = GUARDRAILS.contract_duration;
+      if (terms.contractDurationMonths < gd.min)
+        breaches.push({ level: "warning", message: `Duration ${terms.contractDurationMonths}mo is below minimum ${gd.min}mo` });
+      else if (terms.contractDurationMonths > gd.max)
+        breaches.push({ level: "warning", message: `Duration ${terms.contractDurationMonths}mo exceeds maximum ${gd.max}mo` });
 
-      if (!GUARDRAILS.payment_terms.allowed.includes(terms.paymentTerms))
-        breaches.push({ field: "payment", level: "hard_block", message: `Payment terms '${terms.paymentTerms}' not allowed. Max is Net 90.` });
+      if (financials.ltvCacRatio !== null && financials.ltvCacRatio < GUARDRAILS.ltv_cac_ratio.min)
+        breaches.push({ level: "warning", message: `LTV/CAC ratio ${financials.ltvCacRatio.toFixed(1)}x is below minimum ${GUARDRAILS.ltv_cac_ratio.min}x` });
 
-      if (financials.totalDealValue > GUARDRAILS.total_deal_value.max)
-        breaches.push({ field: "total_value", level: "warning", message: `Total deal value $${Math.round(financials.totalDealValue).toLocaleString()} exceeds $${GUARDRAILS.total_deal_value.max.toLocaleString()} threshold` });
+      if (financials.monthlyRevenue > 0 && financials.marginPct < GUARDRAILS.margin_pct.min)
+        breaches.push({ level: "warning", message: `Margin ${financials.marginPct.toFixed(1)}% is below minimum ${GUARDRAILS.margin_pct.min}%` });
 
-      if (financials.grossMonthly > 0 && financials.marginPct < GUARDRAILS.margin_pct.min)
-        breaches.push({ field: "margin", level: "warning", message: `Margin ${financials.marginPct.toFixed(1)}% is below minimum ${GUARDRAILS.margin_pct.min}%` });
+      if (financials.totalContractValue > GUARDRAILS.total_contract_value.max)
+        breaches.push({ level: "warning", message: `Total contract value $${Math.round(financials.totalContractValue).toLocaleString()} exceeds $${GUARDRAILS.total_contract_value.max.toLocaleString()} threshold` });
 
       return breaches;
     }
 
     // -- Formatting --
     const fmt = (n) => "$" + Math.round(n).toLocaleString();
+    const fmtK = (n) => {
+      if (Math.abs(n) >= 1_000_000) return "$" + (n / 1_000_000).toFixed(1) + "M";
+      if (Math.abs(n) >= 1_000) return "$" + (n / 1_000).toFixed(0) + "K";
+      return "$" + Math.round(n).toLocaleString();
+    };
     const fmtPct = (n) => n.toFixed(1) + "%";
 
     // -- App --
     function App() {
-      const [partnerName, setPartnerName] = useState("Acme Corp");
-      const [dealType, setDealType] = useState("rev_share");
-      const [revSharePct, setRevSharePct] = useState(15);
-      const [flatFeeMonthly, setFlatFeeMonthly] = useState(5000);
-      const [perUnitRate, setPerUnitRate] = useState(2.50);
-      const [durationMonths, setDurationMonths] = useState(12);
-      const [geoScope, setGeoScope] = useState(["US"]);
-      const [exclusivity, setExclusivity] = useState(false);
-      const [paymentTerms, setPaymentTerms] = useState("net_30");
-      const [monthlyVolume, setMonthlyVolume] = useState(1000);
-      const [avgDealValue, setAvgDealValue] = useState(50);
-      const [acquisitionCost, setAcquisitionCost] = useState(10000);
-      const [tieredRates, setTieredRates] = useState([
-        { volumeMin: 0, volumeMax: 100, ratePct: 20 },
-        { volumeMin: 100, volumeMax: 500, ratePct: 15 },
-        { volumeMin: 500, volumeMax: null, ratePct: 10 },
-      ]);
+      const [partnerName, setPartnerName] = useState("GameChannel Co");
+      const [monthlyNewPlayers, setMonthlyNewPlayers] = useState(10000);
+      const [costPerPlayer, setCostPerPlayer] = useState(8);
+      const [monthlySpendPerPlayer, setMonthlySpendPerPlayer] = useState(25);
+      const [playerRetentionMonths, setPlayerRetentionMonths] = useState(6);
+      const [profitSharePct, setProfitSharePct] = useState(15);
+      const [contractDurationMonths, setContractDurationMonths] = useState(12);
+      const [bonusTiers, setBonusTiers] = useState(DEFAULT_BONUS_TIERS);
 
       const terms = {
-        dealType, revSharePct, flatFeeMonthly, perUnitRate,
-        durationMonths, geoScope, exclusivity, paymentTerms,
-        monthlyVolume, avgDealValue, acquisitionCost, tieredRates,
+        monthlyNewPlayers, costPerPlayer, monthlySpendPerPlayer,
+        playerRetentionMonths, profitSharePct, contractDurationMonths, bonusTiers,
       };
 
       const financials = useMemo(() => computeFinancials(terms), [
-        dealType, revSharePct, flatFeeMonthly, perUnitRate,
-        durationMonths, monthlyVolume, avgDealValue, acquisitionCost,
-        JSON.stringify(tieredRates),
+        monthlyNewPlayers, costPerPlayer, monthlySpendPerPlayer,
+        playerRetentionMonths, profitSharePct, contractDurationMonths,
+        JSON.stringify(bonusTiers),
       ]);
 
-      const breaches = useMemo(() => checkGuardrails(terms, financials), [
-        terms, financials,
-      ]);
+      const breaches = useMemo(() => checkGuardrails(terms, financials), [terms, financials]);
 
-      const hasHardBlock = breaches.some(b => b.level === "hard_block");
-
-      const toggleGeo = (geo) => {
-        if (geo === "Global") {
-          setGeoScope(geoScope.includes("Global") ? [] : ["Global"]);
-        } else {
-          let next = geoScope.filter(g => g !== "Global");
-          if (next.includes(geo)) next = next.filter(g => g !== geo);
-          else next.push(geo);
-          setGeoScope(next);
-        }
-      };
-
-      const showRevShare = ["rev_share", "hybrid"].includes(dealType);
-      const showFlatFee = ["flat_fee", "hybrid"].includes(dealType);
-      const showTiered = dealType === "tiered";
-      const showUsage = dealType === "usage_based";
-
-      const marginColor = financials.marginPct >= 50 ? "green"
-        : financials.marginPct >= 20 ? "blue"
+      const marginColor = financials.marginPct >= 60 ? "green"
+        : financials.marginPct >= 30 ? "blue"
         : financials.marginPct >= 0 ? "yellow" : "red";
+
+      const ltvCacColor = financials.ltvCacRatio === null ? "white"
+        : financials.ltvCacRatio >= 5 ? "green"
+        : financials.ltvCacRatio >= 3 ? "blue"
+        : financials.ltvCacRatio >= 1 ? "yellow" : "red";
 
       return (
         <div className="app">
           <div className="header">
-            <h1>Deal Calculator</h1>
-            <p>Configure deal terms and see financials in real-time</p>
+            <h1>Partner Deal Calculator</h1>
+            <p>Gaming player acquisition partnership economics</p>
           </div>
 
-          {/* Partner & Deal Type */}
+          {/* Partner & Player Acquisition */}
           <div className="card">
             <div className="card-title">Deal Setup</div>
             <div className="field">
               <label>Partner Name</label>
-              <input value={partnerName} onChange={e => setPartnerName(e.target.value)} placeholder="e.g. Acme Corp" />
+              <input value={partnerName} onChange={e => setPartnerName(e.target.value)} placeholder="e.g. GameChannel Co" />
             </div>
             <div className="field">
-              <label>Deal Type</label>
-              <select value={dealType} onChange={e => setDealType(e.target.value)}>
-                {DEAL_TYPES.map(dt => <option key={dt.value} value={dt.value}>{dt.label}</option>)}
-              </select>
+              <label>Monthly New Players</label>
+              <input type="number" value={monthlyNewPlayers}
+                onChange={e => setMonthlyNewPlayers(parseInt(e.target.value) || 0)} />
+            </div>
+            <div className="field">
+              <label>Cost Per Player (CPA)</label>
+              <div className="input-wrap">
+                <span className="input-prefix">$</span>
+                <input type="number" step="0.50" value={costPerPlayer}
+                  onChange={e => setCostPerPlayer(parseFloat(e.target.value) || 0)} />
+              </div>
             </div>
           </div>
 
-          {/* Deal Terms */}
+          {/* Player Economics */}
           <div className="card">
-            <div className="card-title">Deal Terms</div>
-
-            {showRevShare && (
-              <div className="field">
-                <label>Revenue Share %</label>
-                <div className="slider-row">
-                  <input type="range" min="1" max="50" step="0.5" value={revSharePct}
-                    onChange={e => setRevSharePct(parseFloat(e.target.value))} />
-                  <span className="slider-value">{revSharePct}%</span>
-                </div>
-              </div>
-            )}
-
-            {showFlatFee && (
-              <div className="field">
-                <label>Flat Fee ($/month)</label>
-                <div className="input-wrap">
-                  <span className="input-prefix">$</span>
-                  <input type="number" value={flatFeeMonthly}
-                    onChange={e => setFlatFeeMonthly(parseFloat(e.target.value) || 0)} />
-                </div>
-              </div>
-            )}
-
-            {showUsage && (
-              <div className="field">
-                <label>Per-Unit Rate ($)</label>
-                <div className="input-wrap">
-                  <span className="input-prefix">$</span>
-                  <input type="number" step="0.01" value={perUnitRate}
-                    onChange={e => setPerUnitRate(parseFloat(e.target.value) || 0)} />
-                </div>
-              </div>
-            )}
-
-            {showTiered && (
-              <div className="field">
-                <label>Tiered Rates</label>
-                <table className="tier-table">
-                  <thead>
-                    <tr><th>From</th><th>To</th><th>Rate %</th></tr>
-                  </thead>
-                  <tbody>
-                    {tieredRates.map((tier, i) => (
-                      <tr key={i}>
-                        <td><input type="number" value={tier.volumeMin} onChange={e => {
-                          const next = [...tieredRates];
-                          next[i] = { ...next[i], volumeMin: parseInt(e.target.value) || 0 };
-                          setTieredRates(next);
-                        }} /></td>
-                        <td><input type="number" placeholder="unlimited" value={tier.volumeMax ?? ""}
-                          onChange={e => {
-                            const next = [...tieredRates];
-                            next[i] = { ...next[i], volumeMax: e.target.value ? parseInt(e.target.value) : null };
-                            setTieredRates(next);
-                          }} /></td>
-                        <td><input type="number" step="0.5" value={tier.ratePct} onChange={e => {
-                          const next = [...tieredRates];
-                          next[i] = { ...next[i], ratePct: parseFloat(e.target.value) || 0 };
-                          setTieredRates(next);
-                        }} /></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                <div className="tier-actions">
-                  <button className="tier-btn" onClick={() => {
-                    const last = tieredRates[tieredRates.length - 1];
-                    setTieredRates([...tieredRates, { volumeMin: last?.volumeMax || 0, volumeMax: null, ratePct: 10 }]);
-                  }}>+ Add Tier</button>
-                  {tieredRates.length > 1 && (
-                    <button className="tier-btn remove" onClick={() => setTieredRates(tieredRates.slice(0, -1))}>Remove Last</button>
-                  )}
-                </div>
-              </div>
-            )}
-
+            <div className="card-title">Player Economics</div>
             <div className="field">
-              <label>Deal Duration</label>
-              <select value={durationMonths} onChange={e => setDurationMonths(parseInt(e.target.value))}>
+              <label>Avg Monthly Spend Per Player (ARPU)</label>
+              <div className="input-wrap">
+                <span className="input-prefix">$</span>
+                <input type="number" step="0.50" value={monthlySpendPerPlayer}
+                  onChange={e => setMonthlySpendPerPlayer(parseFloat(e.target.value) || 0)} />
+              </div>
+            </div>
+            <div className="field">
+              <label>Avg Player Retention (months)</label>
+              <div className="slider-row">
+                <input type="range" min="1" max="24" step="1" value={playerRetentionMonths}
+                  onChange={e => setPlayerRetentionMonths(parseInt(e.target.value))} />
+                <span className="slider-value">{playerRetentionMonths}mo</span>
+              </div>
+            </div>
+            <div className="field">
+              <label>Profit Share %</label>
+              <div className="slider-row">
+                <input type="range" min="1" max="50" step="0.5" value={profitSharePct}
+                  onChange={e => setProfitSharePct(parseFloat(e.target.value))} />
+                <span className="slider-value">{profitSharePct}%</span>
+              </div>
+            </div>
+            <div className="field">
+              <label>Contract Duration</label>
+              <select value={contractDurationMonths} onChange={e => setContractDurationMonths(parseInt(e.target.value))}>
                 {DURATION_OPTIONS.map(d => <option key={d} value={d}>{d} months</option>)}
               </select>
             </div>
-
-            <div className="field">
-              <label>Geo Scope</label>
-              <div className="chips">
-                {GEO_OPTIONS.map(geo => (
-                  <span key={geo} className={`chip ${geoScope.includes(geo) ? "active" : ""}`}
-                    onClick={() => toggleGeo(geo)}>{geo}</span>
-                ))}
-              </div>
-            </div>
-
-            <div className="field">
-              <div className="toggle-row">
-                <label>Exclusivity</label>
-                <label className="toggle">
-                  <input type="checkbox" checked={exclusivity} onChange={e => setExclusivity(e.target.checked)} />
-                  <div className="toggle-track"></div>
-                  <div className="toggle-thumb"></div>
-                </label>
-              </div>
-            </div>
-
-            <div className="field">
-              <label>Payment Terms</label>
-              <select value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)}>
-                {PAYMENT_OPTIONS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
-            </div>
           </div>
 
-          {/* Volume & Revenue */}
+          {/* Bonus Tiers */}
           <div className="card">
-            <div className="card-title">Volume & Revenue</div>
-            <div className="field">
-              <label>Estimated Monthly Volume (units)</label>
-              <input type="number" value={monthlyVolume}
-                onChange={e => setMonthlyVolume(parseInt(e.target.value) || 0)} />
-            </div>
-            <div className="field">
-              <label>Avg Deal Value ($/unit)</label>
-              <div className="input-wrap">
-                <span className="input-prefix">$</span>
-                <input type="number" step="0.01" value={avgDealValue}
-                  onChange={e => setAvgDealValue(parseFloat(e.target.value) || 0)} />
-              </div>
-            </div>
-            <div className="field">
-              <label>Partner Acquisition Cost (one-time)</label>
-              <div className="input-wrap">
-                <span className="input-prefix">$</span>
-                <input type="number" value={acquisitionCost}
-                  onChange={e => setAcquisitionCost(parseFloat(e.target.value) || 0)} />
-              </div>
+            <div className="card-title">Revenue Bonus Tiers</div>
+            <p style={{ fontSize: 12, color: "#8b949e", marginBottom: 10 }}>
+              Extra payout % when total monthly revenue crosses these thresholds
+            </p>
+            <table className="tier-table">
+              <thead>
+                <tr><th>Revenue Threshold</th><th>Bonus %</th></tr>
+              </thead>
+              <tbody>
+                {bonusTiers.map((tier, i) => (
+                  <tr key={i}>
+                    <td>
+                      <input type="number" placeholder="e.g. 500000" value={tier.revenueThreshold}
+                        onChange={e => {
+                          const next = [...bonusTiers];
+                          next[i] = { ...next[i], revenueThreshold: parseFloat(e.target.value) || 0 };
+                          setBonusTiers(next);
+                        }} />
+                    </td>
+                    <td>
+                      <input type="number" step="0.5" value={tier.bonusPct}
+                        onChange={e => {
+                          const next = [...bonusTiers];
+                          next[i] = { ...next[i], bonusPct: parseFloat(e.target.value) || 0 };
+                          setBonusTiers(next);
+                        }} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="tier-actions">
+              <button className="tier-btn" onClick={() => {
+                const last = bonusTiers[bonusTiers.length - 1];
+                setBonusTiers([...bonusTiers, { revenueThreshold: (last?.revenueThreshold || 0) * 2, bonusPct: 2 }]);
+              }}>+ Add Tier</button>
+              {bonusTiers.length > 1 && (
+                <button className="tier-btn remove" onClick={() => setBonusTiers(bonusTiers.slice(0, -1))}>Remove Last</button>
+              )}
             </div>
           </div>
 
@@ -680,21 +547,37 @@
             </div>
           )}
 
-          {/* Financial Output */}
+          {/* Key Metrics */}
           <div className="card">
-            <div className="card-title">Financials</div>
+            <div className="card-title">Key Metrics</div>
             <div className="financials-grid">
               <div className="fin-item">
-                <div className="fin-label">Gross Monthly Rev</div>
-                <div className="fin-value">{fmt(financials.grossMonthly)}</div>
+                <div className="fin-label">New Players / Mo</div>
+                <div className="fin-value">{financials.monthlyNewPlayers.toLocaleString()}</div>
               </div>
               <div className="fin-item">
-                <div className="fin-label">Monthly Payout</div>
-                <div className="fin-value yellow">{fmt(financials.monthlyPayout)}</div>
+                <div className="fin-label">Active Players</div>
+                <div className="fin-value blue">{Math.round(financials.activePlayers).toLocaleString()}</div>
               </div>
               <div className="fin-item">
-                <div className="fin-label">Monthly Net Rev</div>
-                <div className="fin-value green">{fmt(financials.monthlyNet)}</div>
+                <div className="fin-label">Revenue / Mo</div>
+                <div className="fin-value">{fmtK(financials.monthlyRevenue)}</div>
+              </div>
+              <div className="fin-item">
+                <div className="fin-label">Profit / Mo</div>
+                <div className={`fin-value ${financials.monthlyProfit >= 0 ? "green" : "red"}`}>
+                  {fmtK(financials.monthlyProfit)}
+                </div>
+              </div>
+              <div className="fin-item">
+                <div className="fin-label">LTV / Player</div>
+                <div className="fin-value blue">{fmt(financials.ltv)}</div>
+              </div>
+              <div className="fin-item">
+                <div className="fin-label">LTV / CAC</div>
+                <div className={`fin-value ${ltvCacColor}`}>
+                  {financials.ltvCacRatio !== null ? financials.ltvCacRatio.toFixed(1) + "x" : "N/A"}
+                </div>
               </div>
               <div className="fin-item">
                 <div className="fin-label">Margin</div>
@@ -711,32 +594,57 @@
                 </div>
               </div>
               <div className="fin-item">
-                <div className="fin-label">Annual Payout</div>
-                <div className="fin-value">{fmt(financials.annualPayout)}</div>
-              </div>
-              <div className="fin-item">
-                <div className="fin-label">Annual Net Rev</div>
-                <div className="fin-value green">{fmt(financials.annualNet)}</div>
-              </div>
-              <div className="fin-item">
-                <div className="fin-label">Total Deal Value</div>
-                <div className="fin-value blue">{fmt(financials.totalDealValue)}</div>
-              </div>
-              <div className="fin-item">
-                <div className="fin-label">Breakeven</div>
-                <div className="fin-value">
-                  {financials.breakevenMonths === null ? "N/A"
-                    : financials.breakevenMonths === 0 ? "Instant"
-                    : `${financials.breakevenMonths} mo`}
-                </div>
+                <div className="fin-label">Total Contract Value</div>
+                <div className="fin-value blue">{fmtK(financials.totalContractValue)}</div>
               </div>
             </div>
           </div>
 
-          {/* Finalize */}
-          <button className="finalize-btn" disabled={hasHardBlock}
-            onClick={() => alert(`Deal with ${partnerName} finalized!\n\nTotal value: ${fmt(financials.totalDealValue)}\nMargin: ${fmtPct(financials.marginPct)}`)}>
-            {hasHardBlock ? "Cannot Finalize — Fix Guardrail Violations" : "Finalize Deal"}
+          {/* Partner Cost Breakdown */}
+          <div className="card">
+            <div className="card-title">Monthly Partner Cost Breakdown</div>
+            <div className="breakdown-row">
+              <span className="label">CPA Cost ({financials.monthlyNewPlayers.toLocaleString()} players x ${costPerPlayer})</span>
+              <span className="value">{fmt(financials.monthlyCpaCost)}</span>
+            </div>
+            <div className="breakdown-row">
+              <span className="label">Profit Share ({profitSharePct}% of revenue)</span>
+              <span className="value">{fmt(financials.monthlyProfitShare)}</span>
+            </div>
+            <div className="breakdown-row">
+              <span className="label">Bonus Tier Payout</span>
+              <span className="value">{fmt(financials.monthlyBonus)}</span>
+            </div>
+            <div className="breakdown-row" style={{ borderTop: "1px solid #30363d", paddingTop: 8, marginTop: 4 }}>
+              <span className="label" style={{ color: "#c9d1d9", fontWeight: 600 }}>Total Partner Cost / Mo</span>
+              <span className="value" style={{ color: "#d29922" }}>{fmt(financials.monthlyPartnerCost)}</span>
+            </div>
+          </div>
+
+          {/* Contract Totals */}
+          <div className="card">
+            <div className="card-title">Contract Totals ({contractDurationMonths} months)</div>
+            <div className="financials-grid">
+              <div className="fin-item">
+                <div className="fin-label">Total Revenue</div>
+                <div className="fin-value">{fmtK(financials.totalRevenue)}</div>
+              </div>
+              <div className="fin-item">
+                <div className="fin-label">Total Profit</div>
+                <div className={`fin-value ${financials.totalProfit >= 0 ? "green" : "red"}`}>
+                  {fmtK(financials.totalProfit)}
+                </div>
+              </div>
+              <div className="fin-item full-width">
+                <div className="fin-label">Total Partner Payout (Contract Value)</div>
+                <div className="fin-value blue">{fmtK(financials.totalContractValue)}</div>
+              </div>
+            </div>
+          </div>
+
+          <button className="finalize-btn"
+            onClick={() => alert(`Deal with ${partnerName} finalized!\n\nMonthly Revenue: ${fmtK(financials.monthlyRevenue)}\nMonthly Profit: ${fmtK(financials.monthlyProfit)}\nLTV/CAC: ${financials.ltvCacRatio?.toFixed(1) ?? "N/A"}x\nTotal Contract: ${fmtK(financials.totalContractValue)}`)}>
+            Finalize Deal
           </button>
         </div>
       );

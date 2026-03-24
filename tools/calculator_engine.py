@@ -1,121 +1,113 @@
 """
-Deal Calculator Engine
-Source of truth for all deal financial computations.
+Gaming Channel Partner Deal Calculator Engine
+Calculates economics for a player acquisition partnership deal.
 """
 
 from __future__ import annotations
 
 import math
-from enum import Enum
 from dataclasses import dataclass, field
 from typing import Optional, List
 
 
-class DealType(str, Enum):
-    REV_SHARE = "rev_share"
-    FLAT_FEE = "flat_fee"
-    HYBRID = "hybrid"
-    TIERED = "tiered"
-    USAGE_BASED = "usage_based"
-
-
 @dataclass
-class TierRate:
-    volume_min: int
-    volume_max: Optional[int]  # None = unlimited
-    rate_pct: float
+class BonusTier:
+    """When total monthly revenue crosses threshold, partner gets bonus_pct on revenue in that band."""
+    revenue_threshold: float  # e.g. 500_000
+    bonus_pct: float          # e.g. 2.0 for 2%
 
 
 @dataclass
 class DealTerms:
     partner_name: str = ""
-    deal_type: DealType = DealType.REV_SHARE
-    rev_share_pct: float = 0.0           # e.g. 15.0 for 15%
-    flat_fee_monthly: float = 0.0        # e.g. 5000.0
-    tiered_rates: List[TierRate] = field(default_factory=list)
-    per_unit_rate: float = 0.0           # for usage-based
-    deal_duration_months: int = 12
-    geo_scope: List[str] = field(default_factory=lambda: ["Global"])
-    exclusivity: bool = False
-    payment_terms: str = "net_30"
-    monthly_volume: int = 0
-    avg_deal_value: float = 0.0          # revenue per unit
-    acquisition_cost: float = 0.0        # one-time partner onboarding cost
+    monthly_new_players: int = 0
+    cost_per_player: float = 0.0          # CPA paid to partner per acquired player
+    monthly_spend_per_player: float = 0.0 # ARPU — avg in-game spend per player per month
+    player_retention_months: float = 6.0  # avg months a player stays active
+    profit_share_pct: float = 0.0         # % of revenue shared with partner (on top of CPA)
+    contract_duration_months: int = 12
+    bonus_tiers: List[BonusTier] = field(default_factory=list)
 
 
 @dataclass
 class DealFinancials:
-    gross_monthly_revenue: float = 0.0
-    monthly_partner_payout: float = 0.0
-    monthly_net_revenue: float = 0.0
+    monthly_new_players: int = 0
+    active_players: float = 0.0           # steady-state active player base
+    monthly_revenue: float = 0.0          # gross monthly revenue at steady state
+    monthly_cpa_cost: float = 0.0         # monthly CPA payout to partner
+    monthly_profit_share: float = 0.0     # monthly rev share payout to partner
+    monthly_bonus: float = 0.0            # monthly bonus tier payout
+    monthly_partner_cost: float = 0.0     # total monthly payout to partner
+    monthly_profit: float = 0.0           # our monthly profit after partner costs
     margin_pct: float = 0.0
-    annual_partner_payout: float = 0.0
-    annual_net_revenue: float = 0.0
-    total_deal_value: float = 0.0        # total partner payout over term
-    total_net_revenue: float = 0.0       # total net revenue over term
-    breakeven_months: Optional[int] = None
+    ltv_per_player: float = 0.0           # lifetime value of one acquired player
+    cac: float = 0.0                      # cost to acquire one player
+    ltv_cac_ratio: Optional[float] = None
+    total_contract_value: float = 0.0     # total partner payout over contract life
+    total_revenue: float = 0.0            # total revenue over contract life
+    total_profit: float = 0.0             # total profit over contract life
 
 
-def compute_gross_monthly_revenue(terms: DealTerms) -> float:
-    return terms.monthly_volume * terms.avg_deal_value
+def compute_bonus(monthly_revenue: float, tiers: List[BonusTier]) -> float:
+    """Calculate tiered bonus on total monthly revenue (marginal rates)."""
+    if not tiers:
+        return 0.0
 
+    sorted_tiers = sorted(tiers, key=lambda t: t.revenue_threshold)
+    total_bonus = 0.0
 
-def compute_monthly_partner_payout(terms: DealTerms, gross_monthly: float) -> float:
-    if terms.deal_type == DealType.REV_SHARE:
-        return gross_monthly * (terms.rev_share_pct / 100.0)
+    for i, tier in enumerate(sorted_tiers):
+        if monthly_revenue <= tier.revenue_threshold:
+            break
+        # Revenue in this band
+        ceiling = sorted_tiers[i + 1].revenue_threshold if i + 1 < len(sorted_tiers) else float('inf')
+        band_revenue = min(monthly_revenue, ceiling) - tier.revenue_threshold
+        total_bonus += band_revenue * (tier.bonus_pct / 100.0)
 
-    elif terms.deal_type == DealType.FLAT_FEE:
-        return terms.flat_fee_monthly
-
-    elif terms.deal_type == DealType.HYBRID:
-        rev_share_portion = gross_monthly * (terms.rev_share_pct / 100.0)
-        return rev_share_portion + terms.flat_fee_monthly
-
-    elif terms.deal_type == DealType.TIERED:
-        total_payout = 0.0
-        remaining_volume = terms.monthly_volume
-        for tier in sorted(terms.tiered_rates, key=lambda t: t.volume_min):
-            if remaining_volume <= 0:
-                break
-            tier_max = tier.volume_max if tier.volume_max is not None else float('inf')
-            tier_capacity = tier_max - tier.volume_min
-            tier_volume = min(remaining_volume, tier_capacity)
-            tier_revenue = tier_volume * terms.avg_deal_value
-            total_payout += tier_revenue * (tier.rate_pct / 100.0)
-            remaining_volume -= tier_volume
-        return total_payout
-
-    elif terms.deal_type == DealType.USAGE_BASED:
-        return terms.monthly_volume * terms.per_unit_rate
-
-    return 0.0
+    return total_bonus
 
 
 def compute_financials(terms: DealTerms) -> DealFinancials:
-    gross_monthly = compute_gross_monthly_revenue(terms)
-    monthly_payout = compute_monthly_partner_payout(terms, gross_monthly)
-    monthly_net = gross_monthly - monthly_payout
-    margin = (monthly_net / gross_monthly * 100.0) if gross_monthly > 0 else 0.0
+    # Steady-state active players (Little's law)
+    active_players = terms.monthly_new_players * terms.player_retention_months
 
-    annual_payout = monthly_payout * min(terms.deal_duration_months, 12)
-    annual_net = monthly_net * min(terms.deal_duration_months, 12)
-    total_deal_value = monthly_payout * terms.deal_duration_months
-    total_net = monthly_net * terms.deal_duration_months
+    # Monthly revenue from all active players
+    monthly_revenue = active_players * terms.monthly_spend_per_player
 
-    breakeven = None
-    if monthly_net > 0 and terms.acquisition_cost > 0:
-        breakeven = math.ceil(terms.acquisition_cost / monthly_net)
-    elif terms.acquisition_cost == 0 and monthly_net > 0:
-        breakeven = 0
+    # Partner costs
+    monthly_cpa_cost = terms.monthly_new_players * terms.cost_per_player
+    monthly_profit_share = monthly_revenue * (terms.profit_share_pct / 100.0)
+    monthly_bonus = compute_bonus(monthly_revenue, terms.bonus_tiers)
+    monthly_partner_cost = monthly_cpa_cost + monthly_profit_share + monthly_bonus
+
+    # Our profit
+    monthly_profit = monthly_revenue - monthly_partner_cost
+    margin_pct = (monthly_profit / monthly_revenue * 100.0) if monthly_revenue > 0 else 0.0
+
+    # Per-player economics
+    ltv = terms.monthly_spend_per_player * terms.player_retention_months
+    cac = terms.cost_per_player
+    ltv_cac = (ltv / cac) if cac > 0 else None
+
+    # Contract totals (using steady-state monthly figures)
+    total_contract_value = monthly_partner_cost * terms.contract_duration_months
+    total_revenue = monthly_revenue * terms.contract_duration_months
+    total_profit = monthly_profit * terms.contract_duration_months
 
     return DealFinancials(
-        gross_monthly_revenue=round(gross_monthly, 2),
-        monthly_partner_payout=round(monthly_payout, 2),
-        monthly_net_revenue=round(monthly_net, 2),
-        margin_pct=round(margin, 2),
-        annual_partner_payout=round(annual_payout, 2),
-        annual_net_revenue=round(annual_net, 2),
-        total_deal_value=round(total_deal_value, 2),
-        total_net_revenue=round(total_net, 2),
-        breakeven_months=breakeven,
+        monthly_new_players=terms.monthly_new_players,
+        active_players=round(active_players, 0),
+        monthly_revenue=round(monthly_revenue, 2),
+        monthly_cpa_cost=round(monthly_cpa_cost, 2),
+        monthly_profit_share=round(monthly_profit_share, 2),
+        monthly_bonus=round(monthly_bonus, 2),
+        monthly_partner_cost=round(monthly_partner_cost, 2),
+        monthly_profit=round(monthly_profit, 2),
+        margin_pct=round(margin_pct, 2),
+        ltv_per_player=round(ltv, 2),
+        cac=round(cac, 2),
+        ltv_cac_ratio=round(ltv_cac, 2) if ltv_cac is not None else None,
+        total_contract_value=round(total_contract_value, 2),
+        total_revenue=round(total_revenue, 2),
+        total_profit=round(total_profit, 2),
     )
