@@ -82,34 +82,80 @@
       border-color: #58a6ff;
     }
 
-    .slider-row {
+    .tap-edit-row {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
-    .slider-row input[type="range"] {
-      flex: 1;
-      -webkit-appearance: none;
-      height: 6px;
-      background: #30363d;
-      border-radius: 3px;
-      border: none;
-      padding: 0;
-    }
-    .slider-row input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 20px;
-      height: 20px;
-      background: #58a6ff;
-      border-radius: 50%;
+    .tap-edit-value {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #21262d;
+      border: 1px solid #30363d;
+      border-radius: 8px;
+      padding: 8px 14px;
       cursor: pointer;
+      transition: border-color 0.15s;
+      flex: 1;
     }
-    .slider-value {
-      min-width: 52px;
-      text-align: right;
+    .tap-edit-value:hover {
+      border-color: #58a6ff;
+    }
+    .tap-edit-display {
       font-size: 16px;
       font-weight: 600;
       color: #58a6ff;
+      flex: 1;
+    }
+    .tap-edit-hint {
+      font-size: 12px;
+      color: #484f58;
+    }
+    .tap-edit-pencil {
+      font-size: 14px;
+      color: #484f58;
+      transition: color 0.15s;
+    }
+    .tap-edit-value:hover .tap-edit-pencil {
+      color: #58a6ff;
+    }
+    .tap-edit-input-wrap {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex: 1;
+    }
+    .tap-edit-input-wrap input {
+      flex: 1;
+      background: #0d1117;
+      border: 1px solid #58a6ff;
+      border-radius: 8px;
+      color: #e1e4e8;
+      font-size: 16px;
+      font-weight: 600;
+      padding: 8px 14px;
+      outline: none;
+      width: 100%;
+    }
+    .tap-edit-suffix {
+      font-size: 14px;
+      color: #8b949e;
+      white-space: nowrap;
+    }
+    .tap-edit-confirm {
+      background: #238636;
+      border: none;
+      color: #fff;
+      border-radius: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    .tap-edit-confirm:hover {
+      background: #2ea043;
     }
 
     .input-wrap {
@@ -347,6 +393,68 @@
       );
     }
 
+    // -- Tap-to-edit value component (replaces sliders) --
+
+    function TapEdit({ value, onChange, min, max, step, suffix, decimals = 0 }) {
+      const [editing, setEditing] = useState(false);
+      const [draft, setDraft] = useState("");
+      const inputRef = useRef(null);
+
+      const open = () => {
+        setDraft(String(value));
+        setEditing(true);
+        setTimeout(() => { if (inputRef.current) { inputRef.current.focus(); inputRef.current.select(); } }, 0);
+      };
+
+      const commit = () => {
+        setEditing(false);
+        let v = decimals > 0 ? parseFloat(draft) : parseInt(draft);
+        if (isNaN(v)) return;
+        if (min !== undefined) v = Math.max(min, v);
+        if (max !== undefined) v = Math.min(max, v);
+        if (step && step < 1) v = Math.round(v / step) * step;
+        onChange(v);
+      };
+
+      const handleKeyDown = (e) => {
+        if (e.key === "Enter") commit();
+        if (e.key === "Escape") setEditing(false);
+      };
+
+      if (editing) {
+        return (
+          <div className="tap-edit-row">
+            <div className="tap-edit-input-wrap">
+              <input
+                ref={inputRef}
+                type="text"
+                inputMode="decimal"
+                value={draft}
+                onChange={e => setDraft(e.target.value)}
+                onKeyDown={handleKeyDown}
+                onBlur={commit}
+              />
+              {suffix && <span className="tap-edit-suffix">{suffix}</span>}
+            </div>
+          </div>
+        );
+      }
+
+      const display = decimals > 0
+        ? Number(value).toFixed(decimals)
+        : String(value);
+
+      return (
+        <div className="tap-edit-row">
+          <div className="tap-edit-value" onClick={open}>
+            <span className="tap-edit-display">{display}{suffix}</span>
+            <span className="tap-edit-hint">{min}–{max}</span>
+            <span className="tap-edit-pencil">&#9998;</span>
+          </div>
+        </div>
+      );
+    }
+
     // -- Calculator logic (mirrors Python engine) --
 
     function computeBonus(monthlyRevenue, tiers) {
@@ -543,19 +651,13 @@
             </div>
             <div className="field">
               <label>Avg Player Retention (months)</label>
-              <div className="slider-row">
-                <input type="range" min="1" max="24" step="1" value={playerRetentionMonths}
-                  onChange={e => setPlayerRetentionMonths(parseInt(e.target.value))} />
-                <span className="slider-value">{playerRetentionMonths}mo</span>
-              </div>
+              <TapEdit value={playerRetentionMonths} onChange={setPlayerRetentionMonths}
+                min={1} max={24} step={1} suffix="mo" />
             </div>
             <div className="field">
               <label>Profit Share %</label>
-              <div className="slider-row">
-                <input type="range" min="1" max="50" step="0.5" value={profitSharePct}
-                  onChange={e => setProfitSharePct(parseFloat(e.target.value))} />
-                <span className="slider-value">{profitSharePct}%</span>
-              </div>
+              <TapEdit value={profitSharePct} onChange={setProfitSharePct}
+                min={1} max={50} step={0.5} suffix="%" decimals={1} />
             </div>
             <div className="field">
               <label>Contract Duration</label>
@@ -617,19 +719,13 @@
             </p>
             <div className="field">
               <label>Player Giveaways / Promo Costs</label>
-              <div className="slider-row">
-                <input type="range" min="0" max="50" step="1" value={playerGiveawayPct}
-                  onChange={e => setPlayerGiveawayPct(parseInt(e.target.value))} />
-                <span className="slider-value">{playerGiveawayPct}%</span>
-              </div>
+              <TapEdit value={playerGiveawayPct} onChange={setPlayerGiveawayPct}
+                min={0} max={50} step={1} suffix="%" />
             </div>
             <div className="field">
               <label>Overhead & Marketing</label>
-              <div className="slider-row">
-                <input type="range" min="0" max="70" step="1" value={overheadMarketingPct}
-                  onChange={e => setOverheadMarketingPct(parseInt(e.target.value))} />
-                <span className="slider-value">{overheadMarketingPct}%</span>
-              </div>
+              <TapEdit value={overheadMarketingPct} onChange={setOverheadMarketingPct}
+                min={0} max={70} step={1} suffix="%" />
             </div>
           </div>
 
